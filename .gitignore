@@ -2,6 +2,7 @@
 node_modules/
 dist/
 coverage/
+tmp/
 
 # Local environment
 .env
@@ -17,4 +18,3 @@ coverage/
 # Logs and local session files
 *.log
 .Rhistory
-

@@ -1,10 +1,10 @@
-# Expand
+# photile
 
-Expand is a privacy-first web app for turning one photo into a wall-sized composition made from ordinary printer paper. People will be able to upload an image, arrange and rotate Letter or A4 sheets over it, preview the assembled result, and generate a print-ready multi-page PDF entirely in their browser.
+photile is a privacy-first web app for turning one photo into a wall-sized composition made from ordinary printer paper. People will be able to upload an image, arrange and rotate Letter or A4 sheets over it, preview the assembled result, and generate a print-ready multi-page PDF entirely in their browser.
 
 ## Project status
 
-The product and system design are complete. The repository currently contains a minimal React/TypeScript application shell so implementation can begin with the highest-risk milestone: proving the geometry for rotated sheets and physically assembled output.
+The product and system design are complete. Milestone 0 is in progress: the app includes a framework-independent affine geometry core, automated reconstruction tests, an interactive two-sheet preview, and a downloadable physical print fixture.
 
 ## Product constraints
 
@@ -20,6 +20,7 @@ The product and system design are complete. The repository currently contains a 
 
 - [System design plan](./SYSTEM_DESIGN_PLAN.md)
 - [Project-local design context](./.impeccable.md)
+- [Milestone 0 validation guide](./docs/MILESTONE_0.md)
 
 ## Local development
 
@@ -39,10 +40,10 @@ Quality checks:
 
 ```sh
 npm run typecheck
+npm test
 npm run build
 ```
 
 ## Next milestone
 
-Build a framework-independent affine-transform proof that demonstrates a photo remains upright across independently rotated paper sheets, then verify the result with a two-page physical print fixture.
-
+Print the Milestone 0 fixture at Actual size / 100%, verify the 25.4 mm calibration square, and complete the physical alignment check described in the validation guide.

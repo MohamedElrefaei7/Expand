@@ -1,4 +1,4 @@
-# System Design Plan: Browser-Based Tiled Poster Studio
+# photile System Design Plan: Browser-Based Tiled Poster Studio
 
 Status: Proposed design brief and implementation plan  
 Audience: Product design and engineering  
@@ -721,4 +721,3 @@ When moving from this brief into the functional wireframe, consult these Impecca
 ## 24. Confirmation Checkpoint
 
 Before implementation, confirm that the mental model and wireframe are correct—especially the distinction between rotating a physical sheet and rotating the underlying photograph. After confirmation, Milestone 0 should be the first engineering work; it removes the highest-risk technical uncertainty before visual design investment.
-
