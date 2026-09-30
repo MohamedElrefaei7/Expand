@@ -362,6 +362,25 @@ select {
   opacity: 0.68;
 }
 
+.pdf-link {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  text-decoration: none;
+}
+
+.pdf-actions {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.open-pdf-link {
+  color: var(--ink);
+  font-size: 0.82rem;
+  text-align: center;
+  text-underline-offset: 0.2em;
+}
+
 .export-note {
   min-height: 2.5rem;
   margin: calc(var(--space-lg) * -1) 0 0;

@@ -1,20 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PAPER_PRESETS, type PaperPresetId } from './geometry/paper';
 import { createFixtureSheets, DEFAULT_FIXTURE_ANGLES } from './proof/fixture';
 import { ProofPreview } from './proof/ProofPreview';
 
 type ExportState = 'idle' | 'rendering' | 'ready' | 'error';
 
-function downloadBytes(bytes: Uint8Array, filename: string) {
+function createPdfUrl(bytes: Uint8Array) {
   const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  return URL.createObjectURL(blob);
 }
 
 export function App() {
@@ -22,12 +15,19 @@ export function App() {
   const [angleA, setAngleA] = useState<number>(DEFAULT_FIXTURE_ANGLES.a);
   const [angleB, setAngleB] = useState<number>(DEFAULT_FIXTURE_ANGLES.b);
   const [exportState, setExportState] = useState<ExportState>('idle');
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   const paper = PAPER_PRESETS[paperId];
   const sheets = useMemo(
     () => createFixtureSheets(angleA, angleB),
     [angleA, angleB],
   );
+
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    };
+  }, [pdfUrl]);
 
   const resetAngles = () => {
     setAngleA(DEFAULT_FIXTURE_ANGLES.a);
@@ -40,7 +40,7 @@ export function App() {
     try {
       const { generateFixturePdf } = await import('./proof/pdf');
       const bytes = await generateFixturePdf({ paper, sheets, dpi: 150 });
-      downloadBytes(bytes, `expand-geometry-proof-${paper.id}.pdf`);
+      setPdfUrl(createPdfUrl(bytes));
       setExportState('ready');
     } catch (error) {
       console.error(error);
@@ -156,14 +156,28 @@ export function App() {
           >
             {exportState === 'rendering'
               ? 'Rendering two pages…'
-              : 'Download print fixture'}
+              : 'Build print fixture'}
           </button>
 
           <p className={`export-note export-note-${exportState}`} role="status">
-            {exportState === 'ready' && 'PDF ready. Print at Actual size / 100%.'}
+            {exportState === 'ready' && 'PDF ready. Open it, then download or print at Actual size / 100%.'}
             {exportState === 'error' && 'The fixture could not be created. Try again.'}
             {exportState === 'idle' && 'Generated entirely in this browser.'}
           </p>
+          {pdfUrl && (
+            <div className="pdf-actions">
+              <a
+                className="download-button pdf-link"
+                href={pdfUrl}
+                download={`expand-geometry-proof-${paper.id}.pdf`}
+              >
+                Download PDF
+              </a>
+              <a className="open-pdf-link" href={pdfUrl}>
+                Open PDF instead
+              </a>
+            </div>
+          )}
         </aside>
       </section>
 
