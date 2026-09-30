@@ -34,9 +34,9 @@ export async function generateFixturePdf({
   const widthPoints = millimetersToPdfPoints(paper.widthMm);
   const heightPoints = millimetersToPdfPoints(paper.heightMm);
 
-  document.setTitle('photile Milestone 0 Geometry Proof');
+  document.setTitle('Expand Milestone 0 Geometry Proof');
   document.setSubject('Two-sheet rotated paper transform validation fixture');
-  document.setCreator('photile browser geometry proof');
+  document.setCreator('Expand browser geometry proof');
 
   for (const sheet of sheets) {
     const canvas = renderFixturePage(sheet, paper, dpi);
@@ -55,4 +55,3 @@ export async function generateFixturePdf({
 
   return document.save();
 }
-

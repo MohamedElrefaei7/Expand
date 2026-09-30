@@ -1,4 +1,4 @@
-# photile System Design Plan: Browser-Based Tiled Poster Studio
+# Expand System Design Plan: Browser-Based Tiled Poster Studio
 
 Status: Proposed design brief and implementation plan  
 Audience: Product design and engineering  
@@ -6,7 +6,7 @@ Initial platform: Desktop-first responsive web application
 
 ## 1. Product Summary
 
-The product turns one personal photo into a large wall composition made from ordinary printer paper. A user uploads a photo, starts from a familiar arrangement such as 2×2, 3×3, a strip, or a cross, then directly moves and rotates individual sheets over the upright photo. The application previews the assembled wall result and exports a print-ready, multi-page PDF without uploading or retaining the source image.
+The product turns one personal photo into a large wall composition made from ordinary printer paper. A user uploads a photo, starts from a familiar arrangement such as 2×2, 3×3, a strip, or a cross, then directly positions separate, non-overlapping paper tiles over the upright photo. The application previews the assembled wall result and exports a print-ready, multi-page PDF without uploading or retaining the source image.
 
 The product is for everyday consumers, not print professionals. It should feel like a playful creative studio while explaining unavoidable print constraints in plain language. The initial visual treatment will remain intentionally low-fidelity so layout and interaction can be tested before committing to branding, color, and typography.
 
@@ -19,7 +19,7 @@ Arrange ordinary sheets over a photo until the wall-sized composition looks righ
 - A first-time user can go from photo to a useful default PDF without reading documentation.
 - The on-screen composition and assembled print agree in sheet position, orientation, crop, and scale.
 - Users understand how large the result will be and how many sheets it uses before exporting.
-- Rotated sheets preserve the photograph's upright world orientation after physical assembly.
+- Rotated tiles preserve the photograph's upright world orientation after physical assembly while remaining physically separate.
 - No photo bytes leave the browser.
 - Common 2×2 and 3×3 projects remain responsive on ordinary consumer laptops.
 
@@ -28,7 +28,7 @@ Arrange ordinary sheets over a photo until the wall-sized composition looks righ
 1. **Start successful.** Upload immediately produces a centered, printable 2×2 composition with sensible defaults.
 2. **Design in physical units.** The source of truth is millimeters, not screen pixels.
 3. **Show the wall result continuously.** Seams, crop, sheet labels, assembled size, and print limitations are visible before export.
-4. **Direct manipulation plus precision.** Dragging and rotating are playful; snapping, numeric inputs, keyboard control, undo, and reset make the result dependable.
+4. **Direct manipulation plus precision.** Dragging and rotating are playful; snapping, collision prevention, numeric inputs, keyboard control, undo, and reset make the result dependable.
 5. **Progressive disclosure.** Templates and overall size come first; custom placement, edge treatment, exact rotation, and calibration appear as needed.
 6. **Privacy by architecture.** The app is a static client application. The source file stays in memory, is never uploaded, and is discarded when the tab closes or the user starts over.
 7. **Never conceal print physics.** Hardware margins, image resolution, trim requirements, and “print at 100%” are explained before download.
@@ -42,12 +42,12 @@ Arrange ordinary sheets over a photo until the wall-sized composition looks righ
 - US Letter and A4 presets.
 - Same paper size for every sheet in a project.
 - Template presets: 2×2, 3×3, horizontal strip, vertical strip, cross, staggered grid, and blank/freeform.
-- Add, duplicate, remove, drag, multi-select, and rotate sheets.
+- Add, duplicate, remove, drag, multi-select, and rotate non-overlapping tiles.
 - Grid, edge, center, and rotation-angle snapping; all snapping can be disabled temporarily.
 - Upright photograph beneath independently rotated sheets.
 - Pan and zoom the photograph behind the sheet arrangement.
 - Fit, fill, reset, undo, and redo.
-- Three edge modes: trimmed/overlapped, printer-safe, and borderless-printer.
+- Two print-boundary modes: printer-safe and borderless-printer.
 - Live page count, approximate assembled dimensions, image-quality estimate, and printable-area overlay.
 - Multi-page PDF export with page labels, optional trim/registration marks, and an assembly map.
 - Browser-only processing with visible privacy reassurance.
@@ -67,9 +67,9 @@ Arrange ordinary sheets over a photo until the wall-sized composition looks righ
 
 ## 4. Core Mental Model
 
-The editor is a **wall board**, not a document with pages. The photograph exists upright in wall/world space. Each sheet is a movable rectangular window placed over that world. When a sheet is rotated, the window rotates, but the world behind it does not.
+The editor is a **wall board**, not a document with pages. The photograph exists upright in wall/world space. Each sheet is a movable rectangular tile placed over that world. Tiles never overlap: their edges may touch, but templates default to a visible gutter. When a tile is rotated, the window rotates, but the world behind it does not.
 
-For export, each physical PDF page contains the inverse-transformed part of the photograph. After the user prints the sheet and rotates it on the wall to the angle shown in the assembly map, the photo appears upright and continuous.
+For export, each physical PDF page contains the inverse-transformed part of the photograph. After the user prints the tile and places it on the wall at the angle and position shown in the assembly map, the photo appears upright and continuous across the separate tiles; the wall remains visible in their intentional gaps.
 
 This distinction must be present in the data model and geometry engine from the first prototype. Faking it only in the preview would produce incorrect prints.
 
@@ -133,7 +133,7 @@ Behavior:
 │ Snap             │          every paper window           │ [Reposition]       │
 │ [●] Grid         │                                      │                   │
 │ [●] Edges        │                                      │ Result             │
-│ [●] Angles       │                                      │ 4 sheets           │
+│ [●] Angles       │                                      │ 4 separate tiles   │
 │                  │                                      │ 16.5 × 21.5 in     │
 ├──────────────────┴──────────────────────────────────────┴───────────────────┤
 │ [−] 62% [+]  [Fit board]     Grid: 0.25 in      Expected sharpness: Good   │
@@ -206,9 +206,8 @@ This mode prevents the common ambiguity of whether a drag moves paper or the pho
 │ ASSEMBLED PREVIEW                            │ 4 pages · US Letter          │
 │                                              │                              │
 │ [wall composition with numbered sheets]      │ Edge treatment              │
-│                                              │ (●) Trim and overlap         │
-│ Click a page to inspect it.                   │ ( ) Printer-safe gutters     │
-│                                              │ ( ) Borderless printer       │
+│                                              │ (●) Printer-safe margins     │
+│ Click a page to inspect it.                   │ ( ) Borderless printer       │
 │ [Assembly map] [Page 1] [Page 2] [...]       │                              │
 │                                              │ Marks                        │
 │                                              │ [✓] Cut marks                │
@@ -245,7 +244,8 @@ Upload → automatic 2×2 result → choose layout/size → arrange sheets
 - A snap uses separate enter and exit tolerances so the sheet does not flicker at the boundary.
 - Multi-selection moves and rotates around the group center, but the paper size of each sheet remains unchanged.
 - Applying a template replaces the current arrangement only after the user has materially edited it; use an inline “Replace current arrangement?” disclosure, not a modal.
-- Changing between A4 and Letter keeps the composition center and angles, then reflows default templates. Custom layouts preserve centers and flag new overlaps/gaps.
+- Dragging, duplicating, template application, and rotation all run polygon collision checks. A proposed move that would intersect another tile stops at the nearest valid position and shows “Tiles can’t overlap.”
+- Changing between A4 and Letter keeps the composition center and angles, then reflows default templates. Custom layouts preserve centers and flag any invalid collisions for resolution before export.
 
 ### Undo/redo boundaries
 
@@ -278,23 +278,21 @@ Transient pointer movement is not stored. Keep at least 100 lightweight layout c
 | Memory guard | Preserve the session | “This photo is too large to process safely here. Choose a smaller copy.” |
 | Refresh/close | Avoid unexpected loss | Only warn when a photo is loaded and edits are meaningful; explain that the project is not saved |
 
-## 9. Print and Whitespace Strategy
+## 9. Print Boundaries and Intentional Gaps
 
-The browser cannot know a user's exact printer hardware margins. “Remove as much whitespace as possible” therefore becomes an explicit choice rather than an invisible heuristic.
+The browser cannot know a user's exact printer hardware margins. “Remove as much whitespace as possible” therefore means using the largest printable area a chosen printer supports. It never means placing one physical page on top of another.
 
-### Edge modes
+### Print-boundary modes
 
-1. **Trim and overlap — recommended:** extend image content beyond a trim line, add alignment/cut marks, and provide a small configurable overlap. Best visual continuity, but requires cutting paper.
-2. **Printer-safe:** inset content by a conservative user-selected margin. No trimming, but visible gutters are expected.
-3. **Borderless printer:** render to the physical page boundary. The user confirms their printer supports borderless output.
+1. **Printer-safe — default:** inset content by a conservative user-selected margin. The paper remains a separate tile and printer borders may add visual space.
+2. **Borderless printer:** render to the physical page boundary. The user confirms their printer supports borderless output.
 
 Default assumptions for the wireframe:
 
-- Trim/overlap mode is recommended but explained before use.
 - Printer-safe margin starts at 0.25 in / approximately 6 mm and can be changed.
-- Overlap starts at 0.25 in / approximately 6 mm.
-- Marks and labels remain outside the final kept image area whenever possible.
-- The assembly map shows sheet number, angle, relative position, and trim/overlap order.
+- Layout gutters default to 8 mm, are user-adjustable, and remain wall/background space rather than print overlap.
+- Marks and labels remain outside the image area whenever possible.
+- The assembly map shows tile number, angle, center position, and measured gap guidance.
 
 ### Image quality indicator
 
@@ -415,7 +413,7 @@ For each visible sheet:
 1. Transform the sheet rectangle into world/view space.
 2. Clip to the paper or printable polygon.
 3. Draw the shared photo with the world image transform.
-4. Draw trim/safe-area overlay, sheet label, selection state, and rotation handle in separate interaction layers.
+4. Draw printer-safe-area overlay, tile label, selection state, gap guides, and rotation handle in separate interaction layers.
 
 Static photo and paper layers should not rerender for every pointer event. Interaction guides and selection handles use a separate lightweight layer.
 
@@ -425,10 +423,10 @@ For each sheet, sequentially:
 
 1. Create a page-sized `OffscreenCanvas` at the chosen DPI.
 2. Fill the paper background.
-3. Clip to the mode-specific print/bleed region.
+3. Clip to the selected printable region.
 4. Apply `inverse(S) × I`, followed by millimeter-to-pixel scaling.
 5. Draw the full-resolution image with high-quality interpolation.
-6. Add cut/registration marks and sheet label outside the kept region.
+6. Add optional page label and calibration mark outside the image region.
 7. Compress to JPEG for opaque photos or PNG when transparency is required.
 8. Add the image to a correctly sized PDF page.
 9. Release temporary canvas and encoded bytes before proceeding.
@@ -463,9 +461,8 @@ interface PosterProject {
   };
   sheets: Sheet[];
   print: {
-    edgeMode: 'trim-overlap' | 'printer-safe' | 'borderless';
+    edgeMode: 'printer-safe' | 'borderless';
     safeMarginMm: Millimeters;
-    overlapMm: Millimeters;
     marks: boolean;
     labels: boolean;
     calibrationSquare: boolean;
@@ -503,7 +500,7 @@ interface EditorViewState {
 
 ## 13. Template Generation
 
-Templates are functions that accept paper dimensions, gap/overlap, and a center point and return `Sheet[]`. They are not special modes; once created, every sheet is freely editable.
+Templates are functions that accept paper dimensions, a non-negative gap, and a center point and return `Sheet[]`. They are not special modes; once created, every tile is freely editable so long as it does not overlap another tile.
 
 Required generators:
 
@@ -529,7 +526,7 @@ Candidate lines:
 
 - left/right/top/bottom edges;
 - horizontal and vertical centers;
-- intended overlap offsets;
+- template gutter offsets;
 - world origin and template anchors;
 - rotation angles.
 
@@ -539,7 +536,7 @@ Output:
 - winning horizontal, vertical, and angle guides;
 - human-readable hint such as “Aligned centers” or “15°.”
 
-Use pixel-based pointer tolerance converted into world millimeters so snapping feels the same at every zoom level. Test rotated bounding polygons, not only axis-aligned bounding boxes, for overlaps.
+Use pixel-based pointer tolerance converted into world millimeters so snapping feels the same at every zoom level. Test rotated polygons, not only axis-aligned bounding boxes, for collision. Edge contact is valid; positive-area intersection is rejected.
 
 ## 15. State, Persistence, and Privacy
 
@@ -595,7 +592,7 @@ Use pixel-based pointer tolerance converted into world millimeters so snapping f
 Use a source image with numbered quadrants, diagonal lines, a center cross, and a one-inch reference grid. Generate golden outputs for:
 
 - 2×2 unrotated;
-- 3×3 with overlap;
+- 3×3 with an 8 mm gutter;
 - cross layout;
 - sheets at ±15° and 45°;
 - A4 and Letter;
@@ -627,12 +624,12 @@ Test at minimum:
 
 ### Milestone 0 — geometry proof
 
-Build a framework-independent transform prototype with a numbered test image. Prove that two rotated exported sheets align after physical rotation.
+Build a framework-independent transform prototype with a numbered test image. Prove that two rotated, separate exported tiles reconstruct one upright world image after physical placement.
 
 Exit criteria:
 
 - world/sheet/PDF transforms pass automated sample-point tests;
-- a printed two-page rotated fixture aligns within an agreed physical tolerance;
+- a printed two-page rotated fixture remains separate at its measured placement;
 - Letter and A4 dimensions are correct.
 
 ### Milestone 1 — low-fidelity studio
@@ -651,7 +648,7 @@ Add edge modes, preflight, quality estimation, sequential worker rendering, page
 
 Exit criteria:
 
-- printed 2×2, 3×3, cross, and rotated fixtures match the preview;
+- printed 2×2, 3×3, cross, and rotated separate-tile fixtures match the preview;
 - export does not freeze the UI on the tested browser/device matrix;
 - the source image never appears in network traffic, storage, or logs.
 
@@ -689,7 +686,7 @@ Do not collect image content, filename, project geometry, or exact photo dimensi
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Rotated-sheet math looks correct on screen but prints incorrectly | Core promise fails | Prove affine transforms and physically assemble fixtures before building the full editor |
-| Users expect zero margins from printers that cannot print borderless | Frustration and wasted paper | Explicit edge modes, hardware-neutral explanations, trim preview, and test-page guidance |
+| Users expect zero margins from printers that cannot print borderless | Frustration and wasted paper | Explicit print-boundary modes, hardware-neutral explanations, and test-page guidance |
 | Large photos/PDFs exhaust browser memory | Crash or lost work | Preview downsampling, sequential page rendering, worker isolation, memory estimates, DPI recovery |
 | Canvas-only UI excludes keyboard/screen-reader users | Accessibility failure | Mirror every edit in semantic DOM controls and page list |
 | Too many controls make the app feel like professional design software | Audience mismatch | Successful defaults, contextual inspector, progressive disclosure, plain-language labels |
@@ -714,8 +711,8 @@ When moving from this brief into the functional wireframe, consult these Impecca
 - Playful creative-studio interaction model, with final visual identity deferred.
 - US Letter and A4.
 - One downloadable multi-page PDF.
-- Optional overlap and cut marks.
-- Movable and rotatable sheets over an upright photograph.
+- Separate, non-overlapping tiles with adjustable wall gaps.
+- Movable and rotatable tiles over an upright photograph, with collision prevention.
 - Mixed paper sizes, accounts, print ordering, advanced editing, and final art direction remain downstream.
 
 ## 24. Confirmation Checkpoint

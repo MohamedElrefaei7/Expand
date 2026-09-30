@@ -40,7 +40,7 @@ export function App() {
     try {
       const { generateFixturePdf } = await import('./proof/pdf');
       const bytes = await generateFixturePdf({ paper, sheets, dpi: 150 });
-      downloadBytes(bytes, `photile-geometry-proof-${paper.id}.pdf`);
+      downloadBytes(bytes, `expand-geometry-proof-${paper.id}.pdf`);
       setExportState('ready');
     } catch (error) {
       console.error(error);
@@ -51,8 +51,8 @@ export function App() {
   return (
     <main className="proof-shell">
       <header className="topbar">
-        <a className="wordmark" href="#top" aria-label="photile home">
-          photile
+        <a className="wordmark" href="#top" aria-label="Expand home">
+          Expand
         </a>
         <p>Milestone 0 · geometry proof</p>
         <span className="privacy-note">Runs locally</span>
@@ -61,12 +61,12 @@ export function App() {
       <section className="intro" id="top">
         <div>
           <p className="eyebrow">Print lab 00</p>
-          <h1>One image. Two rotated sheets. Still upright.</h1>
+          <h1>One image. Separate tiles. Still continuous.</h1>
         </div>
         <p className="lede">
-          This fixture proves the core photile transform before the editor is
-          built. Each paper window rotates independently while sampling the same
-          world-space artwork.
+          This fixture proves the core Expand transform before the editor is
+          built. Each separate paper tile samples the same upright world-space
+          artwork; the visible gap is part of the wall layout.
         </p>
       </section>
 
@@ -183,7 +183,7 @@ export function App() {
           </li>
           <li>
             <span>03</span>
-            <p>Rotate each sheet to its printed angle and align targets 1–3.</p>
+            <p>Mount the sheets separately, with no overlap, at their printed angles.</p>
           </li>
           <li>
             <span>04</span>

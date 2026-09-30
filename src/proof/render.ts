@@ -183,7 +183,7 @@ function drawPageOverlay(
   );
   context.fillStyle = '#202b3d';
   context.font = `700 ${Math.round(5 * pixelsPerMillimeter)}px Georgia`;
-  context.fillText(`PHOTILE · SHEET ${sheet.label}`, labelX, labelY);
+  context.fillText(`EXPAND · SHEET ${sheet.label}`, labelX, labelY);
   context.font = `${Math.round(3.2 * pixelsPerMillimeter)}px Trebuchet MS`;
   context.fillText(
     `Place at ${sheet.rotationDeg > 0 ? '+' : ''}${sheet.rotationDeg}° · print at 100%`,

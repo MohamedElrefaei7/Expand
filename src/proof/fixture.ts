@@ -1,4 +1,3 @@
-import type { Point } from '../geometry/affine';
 import type { SheetPlacement } from '../geometry/sheet';
 
 export const DEFAULT_FIXTURE_ANGLES = {
@@ -6,11 +5,8 @@ export const DEFAULT_FIXTURE_ANGLES = {
   b: 15,
 } as const;
 
-export const COMMON_TARGETS: Array<Point & { id: string }> = [
-  { id: '1', x: 0, y: -72 },
-  { id: '2', x: 0, y: 0 },
-  { id: '3', x: 0, y: 72 },
-];
+/** Center-to-center wall spacing. It deliberately leaves a visible gap. */
+export const FIXTURE_CENTER_SPACING_MM = 340;
 
 export function createFixtureSheets(
   angleA: number = DEFAULT_FIXTURE_ANGLES.a,
@@ -20,14 +16,14 @@ export function createFixtureSheets(
     {
       id: 'sheet-a',
       label: 'A',
-      centerXmm: -55,
+      centerXmm: -FIXTURE_CENTER_SPACING_MM / 2,
       centerYmm: 0,
       rotationDeg: angleA,
     },
     {
       id: 'sheet-b',
       label: 'B',
-      centerXmm: 55,
+      centerXmm: FIXTURE_CENTER_SPACING_MM / 2,
       centerYmm: 0,
       rotationDeg: angleB,
     },

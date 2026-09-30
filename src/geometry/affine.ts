@@ -45,7 +45,7 @@ export function scaling(x: number, y = x): AffineMatrix {
   return { a: x, b: 0, c: 0, d: y, e: 0, f: 0 };
 }
 
-/** Positive angles rotate clockwise in photile's y-down world coordinates. */
+/** Positive angles rotate clockwise in Expand's y-down world coordinates. */
 export function rotationDegrees(degrees: number): AffineMatrix {
   const radians = (degrees * Math.PI) / 180;
   const cosine = Math.cos(radians);
@@ -98,4 +98,3 @@ export function setCanvasTransform(
     matrix.f,
   );
 }
-

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Prove that photile can sample one upright world-space image onto independently rotated physical sheets and reconstruct that image after printing and placing the sheets at their intended angles.
+Prove that Expand can sample one upright world-space image onto independently rotated, non-overlapping physical tiles and reconstruct that image after printing and placing the tiles at their intended angles.
 
 ## Coordinate model
 
@@ -38,7 +38,7 @@ The test suite verifies:
 - exact US Letter and A4 dimensions;
 - correct PDF point dimensions;
 - world → page → world reconstruction for both rotated sheets;
-- all three shared registration targets remain printable on both paper presets;
+- the default fixture tiles remain physically separate on both paper presets;
 - reconstructed world-horizontal artwork remains horizontal.
 
 ## Physical validation
@@ -48,17 +48,15 @@ The test suite verifies:
 3. Choose US Letter or A4 and download the fixture.
 4. Print both pages using **Actual size** or **100%**. Disable “Fit to page.”
 5. Measure the printed calibration square. It must be 25.4 mm on each side. If it is not, the PDF viewer or printer scaled the page and the test is invalid.
-6. Rotate the sheets to the angles printed on them.
-7. Use a bright window, light pad, or pinholes through the centers of registration targets 1–3 to align the two sheets.
-8. Confirm the world grid, central axes, diagonal green band, and PHOTILE word remain upright and share the same world coordinates.
-9. Measure any visible drift at the three targets and record the maximum.
+6. Place the centers 340 mm apart on a horizontal baseline, then rotate each tile to the angle printed on it. Do not overlap the paper.
+7. Confirm the world grid, central axes, diagonal green band, and EXPAND word remain upright across the two separated tiles.
+8. Confirm there is visible wall space between the physical sheets at every point.
 
 ## Acceptance record
 
 Automated geometry: implemented and passing.  
 Letter/A4 dimensions: implemented and passing.  
 Physical two-page print: pending.  
-Agreed physical tolerance: proposed maximum target drift of 1 mm after confirming the calibration square is exact.
+Agreed physical tolerance: the pages must remain separated with a visible gap after the 340 mm center-to-center placement is measured.
 
 Milestone 0 is complete only after the physical test result and printer/PDF-viewer combination are recorded here.
-

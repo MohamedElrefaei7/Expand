@@ -48,7 +48,7 @@ export function ProofPreview({ paper, sheets }: ProofPreviewProps) {
       <canvas
         ref={canvasRef}
         role="img"
-        aria-label={`Two ${paper.label} sheets rotated ${sheets[0]?.rotationDeg ?? 0} and ${sheets[1]?.rotationDeg ?? 0} degrees over one upright test image`}
+        aria-label={`Two separate ${paper.label} tiles rotated ${sheets[0]?.rotationDeg ?? 0} and ${sheets[1]?.rotationDeg ?? 0} degrees over one upright test image`}
       />
     </div>
   );

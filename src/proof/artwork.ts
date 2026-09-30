@@ -1,35 +1,4 @@
-import type { Point } from '../geometry/affine';
-import { COMMON_TARGETS } from './fixture';
-
 const WORLD_EXTENT_MM = 500;
-
-function drawTarget(
-  context: CanvasRenderingContext2D,
-  target: Point & { id: string },
-) {
-  context.save();
-  context.translate(target.x, target.y);
-  context.strokeStyle = '#c32882';
-  context.fillStyle = '#c32882';
-  context.lineWidth = 1.3;
-  context.beginPath();
-  context.arc(0, 0, 8, 0, Math.PI * 2);
-  context.moveTo(-12, 0);
-  context.lineTo(12, 0);
-  context.moveTo(0, -12);
-  context.lineTo(0, 12);
-  context.stroke();
-  context.fillStyle = '#f7f2e6';
-  context.beginPath();
-  context.arc(0, 0, 4.5, 0, Math.PI * 2);
-  context.fill();
-  context.fillStyle = '#c32882';
-  context.font = '700 7px Trebuchet MS';
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText(target.id, 0, 0);
-  context.restore();
-}
 
 /** Draws a deterministic, upright world-space image proxy measured in mm. */
 export function drawWorldArtwork(context: CanvasRenderingContext2D) {
@@ -101,7 +70,7 @@ export function drawWorldArtwork(context: CanvasRenderingContext2D) {
   context.font = '700 25px Georgia';
   context.textAlign = 'center';
   context.textBaseline = 'middle';
-  context.fillText('PHOTILE', 0, -18);
+  context.fillText('EXPAND', 0, -18);
 
   context.font = '700 6px Trebuchet MS';
   context.fillText('WORLD-SPACE TEST ARTWORK', 0, 12);
@@ -115,5 +84,4 @@ export function drawWorldArtwork(context: CanvasRenderingContext2D) {
   context.lineTo(0, WORLD_EXTENT_MM);
   context.stroke();
 
-  COMMON_TARGETS.forEach((target) => drawTarget(context, target));
 }

@@ -1,6 +1,6 @@
-# photile
+# Expand
 
-photile is a privacy-first web app for turning one photo into a wall-sized composition made from ordinary printer paper. People will be able to upload an image, arrange and rotate Letter or A4 sheets over it, preview the assembled result, and generate a print-ready multi-page PDF entirely in their browser.
+Expand is a privacy-first web app for turning one photo into a wall-sized composition made from ordinary printer paper. People will be able to upload an image, arrange separate, non-overlapping Letter or A4 tiles over it, preview the assembled result, and generate a print-ready multi-page PDF entirely in their browser.
 
 ## Project status
 
@@ -13,7 +13,7 @@ The product and system design are complete. Milestone 0 is in progress: the app 
 - No accounts, uploads, or retained image data
 - Desktop-first editor with responsive essential controls
 - US Letter and A4 output
-- Upright source photo beneath movable and rotatable paper windows
+- Upright source photo spanning movable, rotatable, non-overlapping paper tiles
 - Final visual identity deferred until the workflow is validated
 
 ## Documentation

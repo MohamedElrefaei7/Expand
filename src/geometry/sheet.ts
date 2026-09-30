@@ -96,3 +96,42 @@ export function isWorldPointOnSheet(
   );
 }
 
+/**
+ * True only when the interior of two physical sheets intersects. Touching at
+ * an edge is allowed; production templates use a positive gap by default.
+ */
+export function sheetsOverlap(
+  first: SheetPlacement,
+  second: SheetPlacement,
+  paper: PaperPreset,
+): boolean {
+  const firstCorners = sheetCornersWorld(first, paper);
+  const secondCorners = sheetCornersWorld(second, paper);
+  const polygons = [firstCorners, secondCorners];
+  const epsilon = 1e-7;
+
+  for (const polygon of polygons) {
+    for (let index = 0; index < polygon.length; index += 1) {
+      const start = polygon[index];
+      const end = polygon[(index + 1) % polygon.length];
+      if (!start || !end) continue;
+
+      const axis = { x: -(end.y - start.y), y: end.x - start.x };
+      const project = (corners: Point[]) => {
+        const values = corners.map((corner) => corner.x * axis.x + corner.y * axis.y);
+        return { min: Math.min(...values), max: Math.max(...values) };
+      };
+      const firstProjection = project(firstCorners);
+      const secondProjection = project(secondCorners);
+
+      if (
+        firstProjection.max <= secondProjection.min + epsilon ||
+        secondProjection.max <= firstProjection.min + epsilon
+      ) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}

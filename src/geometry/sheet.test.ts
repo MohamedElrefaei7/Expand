@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMMON_TARGETS, createFixtureSheets } from '../proof/fixture';
+import { createFixtureSheets } from '../proof/fixture';
 import { applyToPoint } from './affine';
 import {
   MILLIMETERS_PER_INCH,
@@ -7,8 +7,8 @@ import {
   millimetersToPdfPoints,
 } from './paper';
 import {
-  isWorldPointOnSheet,
   pagePixelsToWorldMatrix,
+  sheetsOverlap,
   worldToPagePixelsMatrix,
 } from './sheet';
 
@@ -57,10 +57,11 @@ describe('world to printed sheet reconstruction', () => {
       });
     }
 
-    it(`keeps all three alignment targets on both ${paper.id} sheets`, () => {
-      for (const target of COMMON_TARGETS) {
-        for (const sheet of sheets) {
-          expect(isWorldPointOnSheet(target, sheet, paper)).toBe(true);
+    it(`keeps the fixture tiles separate throughout the ${paper.id} angle range`, () => {
+      for (const angleA of [-30, 30]) {
+        for (const angleB of [-30, 30]) {
+          const [first, second] = createFixtureSheets(angleA, angleB);
+          expect(sheetsOverlap(first!, second!, paper)).toBe(false);
         }
       }
     });
@@ -79,5 +80,18 @@ describe('world to printed sheet reconstruction', () => {
       expect(reconstructedEnd.y - reconstructedStart.y).toBeCloseTo(0, 9);
       expect(reconstructedEnd.x - reconstructedStart.x).toBeCloseTo(20, 9);
     }
+  });
+
+  it('detects overlapping physical sheets', () => {
+    const [first, second] = createFixtureSheets();
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    expect(
+      sheetsOverlap(
+        first!,
+        { ...second!, centerXmm: first!.centerXmm + 10 },
+        PAPER_PRESETS.letter,
+      ),
+    ).toBe(true);
   });
 });
