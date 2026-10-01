@@ -56,7 +56,7 @@ The test suite verifies:
 
 Automated geometry: implemented and passing.  
 Letter/A4 dimensions: implemented and passing.  
-Physical two-page print: pending.  
-Agreed physical tolerance: the pages must remain separated with a visible gap after the 340 mm center-to-center placement is measured.
+Physical two-page print: passed on September 30, 2026.
+Agreed physical tolerance: passed; the pages remained separated with a visible gap after the 340 mm center-to-center placement was measured.
 
-Milestone 0 is complete only after the physical test result and printer/PDF-viewer combination are recorded here.
+Milestone 0 is complete. The physical test confirmed the browser-generated PDF downloads correctly and the separated paper tiles assemble as expected.

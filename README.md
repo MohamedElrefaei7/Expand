@@ -4,7 +4,7 @@ Expand is a privacy-first web app for turning one photo into a wall-sized compos
 
 ## Project status
 
-The product and system design are complete. Milestone 0 is in progress: the app includes a framework-independent affine geometry core, automated reconstruction tests, an interactive two-sheet preview, and a downloadable physical print fixture.
+Milestone 0 is complete: the affine geometry proof passed automated checks and a physical two-page print test. Milestone 1 is now underway with a functional local-upload and wall-layout wireframe.
 
 ## Product constraints
 
@@ -46,4 +46,4 @@ npm run build
 
 ## Next milestone
 
-Print the Milestone 0 fixture at Actual size / 100%, verify the 25.4 mm calibration square, and complete the physical alignment check described in the validation guide.
+Iterate the functional wireframe with real photos: refine templates and manipulation, add rotation-aware collision handling, then connect the editor to the proven print renderer.
