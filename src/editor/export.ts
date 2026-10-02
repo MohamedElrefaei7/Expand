@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb } from 'pdf-lib';
 import { multiply, scaling, setCanvasTransform, translation } from '../geometry/affine';
 import { millimetersToPdfPoints, millimetersToPixels, type PaperPreset } from '../geometry/paper';
 import { worldToPagePixelsMatrix } from '../geometry/sheet';
@@ -130,5 +130,48 @@ export async function generateLayoutPdf({
     canvas.width = 1;
     canvas.height = 1;
   }
+  return document.save();
+}
+
+/** A one-page physical test: the first fully visible ruler line is that edge's printable offset. */
+export async function generateCalibrationPdf({ paper }: { paper: PaperPreset }) {
+  const document = await PDFDocument.create();
+  document.setTitle('Expand printer border calibration');
+  document.setSubject('Measure the first visible ruler line on each paper edge.');
+  document.setCreator('Expand');
+  const width = millimetersToPdfPoints(paper.widthMm);
+  const height = millimetersToPdfPoints(paper.heightMm);
+  const millimeter = millimetersToPdfPoints(1);
+  const page = document.addPage([width, height]);
+  const blue = rgb(0.19, 0.36, 0.73);
+  const ink = rgb(0.12, 0.17, 0.24);
+  const muted = rgb(0.32, 0.36, 0.42);
+  const rulerStart = 36 * millimeter;
+  const rulerEndX = width - rulerStart;
+  const rulerEndY = height - rulerStart;
+
+  page.drawText('EXPAND · PRINTER BORDER CALIBRATION', { x: rulerStart, y: height - 46 * millimeter, size: 13, color: ink });
+  page.drawText(`Print on ${paper.label} at Actual size / 100%. Do not use Fit to page.`, { x: rulerStart, y: height - 53 * millimeter, size: 8, color: muted });
+  page.drawText('For each edge, find the first fully visible numbered line. Enter those four millimetre values in Expand.', { x: rulerStart, y: height - 59 * millimeter, size: 8, color: muted });
+  page.drawRectangle({ x: 28 * millimeter, y: 28 * millimeter, width: width - 56 * millimeter, height: height - 90 * millimeter, borderColor: muted, borderWidth: 0.5 });
+
+  for (let offset = 1; offset <= 25; offset += 1) {
+    const distance = offset * millimeter;
+    const strokeWidth = offset % 5 === 0 ? 1.15 : 0.45;
+    const text = String(offset);
+    page.drawLine({ start: { x: rulerStart, y: height - distance }, end: { x: rulerEndX, y: height - distance }, thickness: strokeWidth, color: blue });
+    page.drawLine({ start: { x: rulerStart, y: distance }, end: { x: rulerEndX, y: distance }, thickness: strokeWidth, color: blue });
+    page.drawLine({ start: { x: distance, y: rulerStart }, end: { x: distance, y: rulerEndY }, thickness: strokeWidth, color: blue });
+    page.drawLine({ start: { x: width - distance, y: rulerStart }, end: { x: width - distance, y: rulerEndY }, thickness: strokeWidth, color: blue });
+    page.drawText(text, { x: 8 * millimeter, y: height - distance - 1.6 * millimeter, size: 5.5, color: ink });
+    page.drawText(text, { x: 8 * millimeter, y: distance - 1.6 * millimeter, size: 5.5, color: ink });
+    page.drawText(text, { x: distance - 1.6 * millimeter, y: 18 * millimeter, size: 5.5, color: ink });
+    page.drawText(text, { x: width - distance - 1.6 * millimeter, y: 18 * millimeter, size: 5.5, color: ink });
+  }
+
+  page.drawText('TOP', { x: width / 2 - 12, y: height - 21 * millimeter, size: 8, color: ink });
+  page.drawText('BOTTOM', { x: width / 2 - 20, y: 10 * millimeter, size: 8, color: ink });
+  page.drawText('LEFT', { x: 8 * millimeter, y: height / 2, size: 8, color: ink });
+  page.drawText('RIGHT', { x: width - 24 * millimeter, y: height / 2, size: 8, color: ink });
   return document.save();
 }

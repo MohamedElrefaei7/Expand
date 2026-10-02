@@ -7,6 +7,7 @@ type Screen = 'studio' | 'print-check';
 type PrintMode = 'safe' | 'borderless';
 interface Tile { id: string; label: number; x: number; y: number; width: number; height: number; rotationDeg: number; }
 interface DragState { id: string; offsetX: number; offsetY: number; before: Tile[]; }
+interface PrinterMargins { top: number; right: number; bottom: number; left: number; }
 
 const templateLabels: Record<TemplateId, string> = { 'grid-2': '2 × 2', 'grid-3': '3 × 3', strip: 'Strip', cross: 'Cross' };
 
@@ -97,10 +98,13 @@ export function App() {
   const [gapMm, setGapMm] = useState(8);
   const [screen, setScreen] = useState<Screen>('studio');
   const [printMode, setPrintMode] = useState<PrintMode>('safe');
+  const [printerMargins, setPrinterMargins] = useState<PrinterMargins>({ top: 0, right: 0, bottom: 0, left: 0 });
   const [history, setHistory] = useState<Tile[][]>([]);
   const [redoHistory, setRedoHistory] = useState<Tile[][]>([]);
   const [exportState, setExportState] = useState<'idle' | 'rendering' | 'ready' | 'error'>('idle');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [calibrationPdfUrl, setCalibrationPdfUrl] = useState<string | null>(null);
+  const [calibrationState, setCalibrationState] = useState<'idle' | 'rendering' | 'ready' | 'error'>('idle');
   const [notice, setNotice] = useState('Choose a JPEG, PNG, or WebP image to begin.');
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
@@ -109,6 +113,7 @@ export function App() {
 
   useEffect(() => () => { if (imageUrl) URL.revokeObjectURL(imageUrl); }, [imageUrl]);
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
+  useEffect(() => () => { if (calibrationPdfUrl) URL.revokeObjectURL(calibrationPdfUrl); }, [calibrationPdfUrl]);
   const boardStyle = useMemo(() => ({ backgroundImage: imageUrl ? `url(${imageUrl})` : undefined, backgroundSize: `${photoScale}%`, backgroundPosition: `${50 + photoOffsetX}% ${50 + photoOffsetY}%` }), [imageUrl, photoOffsetX, photoOffsetY, photoScale]);
 
   const loadImage = (file: File | undefined) => {
@@ -136,7 +141,9 @@ export function App() {
   const rotateSelected = (amount: number) => { if (!selectedTile) return; const candidate = { ...selectedTile, rotationDeg: ((selectedTile.rotationDeg + amount + 180) % 360) - 180 }; if (!isAllowed(candidate, tiles)) { setNotice('That angle would touch another tile or leave the wall board.'); return; } commitTiles(tiles.map((tile) => tile.id === selectedTile.id ? candidate : tile), `Tile ${selectedTile.label} rotated to ${candidate.rotationDeg}°.`); };
   const undo = () => { const previous = history.at(-1); if (!previous) return; setRedoHistory((current) => [...current, tiles]); setTiles(previous); setHistory((current) => current.slice(0, -1)); setNotice('Undid the last layout change.'); };
   const redo = () => { const next = redoHistory.at(-1); if (!next) return; setHistory((current) => [...current, tiles]); setTiles(next); setRedoHistory((current) => current.slice(0, -1)); setNotice('Restored the layout change.'); };
-  const exportPdf = async () => { if (!imageUrl || !tiles[0]) return; setExportState('rendering'); try { const { generateLayoutPdf } = await import('./editor/export'); const bytes = await generateLayoutPdf({ paper, tiles, imageUrl, imagePlacement: { scalePercent: photoScale, offsetX: photoOffsetX, offsetY: photoOffsetY }, worldScaleMm: paper.heightMm / tiles[0].height, safeMarginMm: printMode === 'safe' ? 6 : 0 }); const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); setPdfUrl(url); setExportState('ready'); setNotice(`Built ${tiles.length} print-ready pages locally.`); } catch (error) { console.error(error); setExportState('error'); setNotice('The PDF could not be created. Your layout is still safe here.'); } };
+  const exportPdf = async () => { if (!imageUrl || !tiles[0]) return; setExportState('rendering'); try { const { generateLayoutPdf } = await import('./editor/export'); const bytes = await generateLayoutPdf({ paper, tiles, imageUrl, imagePlacement: { scalePercent: photoScale, offsetX: photoOffsetX, offsetY: photoOffsetY }, worldScaleMm: paper.heightMm / tiles[0].height, safeMarginMm: printMode === 'safe' ? matchedBorderMm : 0 }); const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); setPdfUrl(url); setExportState('ready'); setNotice(`Built ${tiles.length} print-ready pages locally.`); } catch (error) { console.error(error); setExportState('error'); setNotice('The PDF could not be created. Your layout is still safe here.'); } };
+  const buildCalibrationPdf = async () => { setCalibrationState('rendering'); try { const { generateCalibrationPdf } = await import('./editor/export'); const bytes = await generateCalibrationPdf({ paper }); const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); setCalibrationPdfUrl((current) => { if (current) URL.revokeObjectURL(current); return url; }); setCalibrationState('ready'); } catch (error) { console.error(error); setCalibrationState('error'); } };
+  const updatePrinterMargin = (edge: keyof PrinterMargins, value: string) => { const number = Math.max(0, Math.min(25, Number(value) || 0)); setPrinterMargins((current) => ({ ...current, [edge]: number })); };
   const tileImageStyle = (tile: Tile) => {
     const imageLeft = (100 - photoScale) / 2 + photoOffsetX;
     const imageTop = (100 - photoScale / imageAspect) / 2 + photoOffsetY;
@@ -145,6 +152,8 @@ export function App() {
   const worldScaleMm = tiles[0] ? paper.heightMm / tiles[0].height : 0;
   const effectivePpi = imageDimensions.width && worldScaleMm ? Math.round(imageDimensions.width / ((photoScale * worldScaleMm) / 25.4)) : null;
   const qualityMessage = !effectivePpi ? 'Checking source quality…' : effectivePpi >= 150 ? 'Good for normal wall viewing' : effectivePpi >= 100 ? 'May look soft when viewed closely' : 'Likely blurry when viewed closely';
+  const calibrationComplete = Object.values(printerMargins).every((margin) => margin > 0);
+  const matchedBorderMm = Math.max(6, ...Object.values(printerMargins));
 
   if (!imageUrl) return <main className="start-shell">
     <header className="studio-topbar"><a className="wordmark" href="#top">Expand</a><span className="privacy-note">Private by default</span></header>
@@ -161,7 +170,8 @@ export function App() {
       <div className="print-check-intro"><p className="eyebrow">One last look</p><h1>Ready for the printer?</h1><p>This is the moment to make the physical choices. Your artwork stays in this browser while the PDF is made.</p><div className="assembly-map" aria-label={`${tiles.length} separate page arrangement`}>{tiles.map((tile) => <span key={tile.id} style={{ left: `${tile.x}%`, top: `${tile.y}%`, width: `${tile.width}%`, height: `${tile.height}%`, transform: `rotate(${tile.rotationDeg}deg)` }}>{tile.label}</span>)}</div></div>
       <div className="print-check-details">
         <div className="check-summary"><p className="rail-label">Your print</p><dl><div><dt>Pages</dt><dd>{tiles.length} separate {paper.label} sheets</dd></div><div><dt>Wall gap</dt><dd>{gapMm} mm between pages</dd></div><div><dt>Image quality</dt><dd>{qualityMessage}{effectivePpi && <small> · about {effectivePpi} PPI</small>}</dd></div></dl></div>
-        <fieldset className="print-mode"><legend>Printer edge setting</legend><label className={printMode === 'safe' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'safe'} onChange={() => setPrintMode('safe')} /><span><strong>Leave a 6 mm white edge</strong><small>Best for most home printers. The image remains within printable area.</small></span></label><label className={printMode === 'borderless' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'borderless'} onChange={() => setPrintMode('borderless')} /><span><strong>Print edge to edge</strong><small>Choose only if your printer supports borderless {paper.label} printing.</small></span></label></fieldset>
+        <fieldset className="print-mode"><legend>Printer edge setting</legend><label className={printMode === 'safe' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'safe'} onChange={() => setPrintMode('safe')} /><span><strong>Leave a matched {matchedBorderMm} mm white edge</strong><small>{calibrationComplete ? 'Using the largest measured printer edge so every page has the same visible border.' : 'Best for most home printers. Calibrate below if your borders are uneven.'}</small></span></label><label className={printMode === 'borderless' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'borderless'} onChange={() => setPrintMode('borderless')} /><span><strong>Print edge to edge</strong><small>Choose only if your printer supports borderless {paper.label} printing.</small></span></label></fieldset>
+        <section className="calibration-panel" aria-labelledby="calibration-heading"><div><p className="rail-label">Fix uneven borders</p><h2 id="calibration-heading">Calibrate this printer</h2><p>Print one ruler sheet on this printer at Actual size. For each edge, enter the first fully visible ruler number. Expand then uses the largest edge as a shared border.</p></div><div className="calibration-actions"><button className="history-button" type="button" onClick={buildCalibrationPdf} disabled={calibrationState === 'rendering'}>{calibrationState === 'rendering' ? 'Building calibration…' : 'Build calibration PDF'}</button>{calibrationPdfUrl && <a className="text-download" href={calibrationPdfUrl} download={`expand-calibration-${paper.id}.pdf`}>Download calibration PDF</a>}</div><div className="margin-inputs">{(['top', 'right', 'bottom', 'left'] as const).map((edge) => <label key={edge} htmlFor={`margin-${edge}`}><span>{edge}</span><input id={`margin-${edge}`} type="number" min="0" max="25" step="1" value={printerMargins[edge] || ''} placeholder="mm" onChange={(event) => updatePrinterMargin(edge, event.target.value)} /><small>mm</small></label>)}</div><p className="calibration-result">{calibrationComplete ? `Use a ${matchedBorderMm} mm matched border. The app compensates by never placing image content closer than that to any paper edge.` : 'No measurements saved yet. Leave these blank to keep the standard 6 mm white edge.'}</p></section>
         <div className="home-print-note"><p className="rail-label">When the PDF opens</p><ol><li>Select <strong>{paper.label}</strong> in the print dialog.</li><li>Choose <strong>Actual size</strong> or <strong>100%</strong>—not “Fit to page.”</li><li>Keep every page separate, then mount them with the {gapMm} mm gap shown in the layout.</li></ol></div>
         <div className="check-actions"><button className="print-button" type="button" onClick={exportPdf} disabled={exportState === 'rendering'}>{exportState === 'rendering' ? 'Building your PDF…' : `Build ${tiles.length}-page PDF →`}</button>{pdfUrl && <a className="pdf-ready-link" href={pdfUrl} download={`expand-layout-${paper.id}.pdf`}>Download PDF</a>}<p className="status-message" role="status">{notice}</p></div>
       </div>
