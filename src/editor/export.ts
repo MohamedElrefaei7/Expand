@@ -44,6 +44,7 @@ function renderPage(
   imagePlacement: ImagePlacement,
   worldScaleMm: number,
   dpi: number,
+  safeMarginMm: number,
 ) {
   const canvas = document.createElement('canvas');
   const width = Math.round(millimetersToPixels(paper.widthMm, dpi));
@@ -57,6 +58,7 @@ function renderPage(
   context.fillRect(0, 0, width, height);
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
+  const safeMarginPixels = millimetersToPixels(safeMarginMm, dpi);
 
   const imageAspect = image.naturalWidth / image.naturalHeight;
   const imageLeftUnits = (100 - imagePlacement.scalePercent) / 2 + imagePlacement.offsetX;
@@ -75,8 +77,13 @@ function renderPage(
     translation(imageWorldLeft, imageWorldTop),
     scaling(imageWorldWidth / image.naturalWidth),
   );
+  context.save();
+  context.beginPath();
+  context.rect(safeMarginPixels, safeMarginPixels, width - safeMarginPixels * 2, height - safeMarginPixels * 2);
+  context.clip();
   setCanvasTransform(context, multiply(worldToPagePixelsMatrix(sheet, paper, dpi), imageToWorld));
   context.drawImage(image, 0, 0);
+  context.restore();
 
   context.setTransform(1, 0, 0, 1, 0, 0);
   const pixelsPerMillimeter = millimetersToPixels(1, dpi);
@@ -97,6 +104,7 @@ export async function generateLayoutPdf({
   imagePlacement,
   worldScaleMm,
   dpi = 150,
+  safeMarginMm = 0,
 }: {
   paper: PaperPreset;
   tiles: ExportTile[];
@@ -104,6 +112,7 @@ export async function generateLayoutPdf({
   imagePlacement: ImagePlacement;
   worldScaleMm: number;
   dpi?: number;
+  safeMarginMm?: number;
 }) {
   const image = await loadImage(imageUrl);
   const document = await PDFDocument.create();
@@ -114,7 +123,7 @@ export async function generateLayoutPdf({
   const heightPoints = millimetersToPdfPoints(paper.heightMm);
 
   for (const tile of tiles) {
-    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi);
+    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi, safeMarginMm);
     const png = await document.embedPng(await canvasToPngBytes(canvas));
     const page = document.addPage([widthPoints, heightPoints]);
     page.drawImage(png, { x: 0, y: 0, width: widthPoints, height: heightPoints });

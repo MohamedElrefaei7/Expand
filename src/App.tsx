@@ -3,6 +3,8 @@ import { PAPER_PRESETS, type PaperPreset, type PaperPresetId } from './geometry/
 
 type TemplateId = 'grid-2' | 'grid-3' | 'strip' | 'cross';
 type EditorMode = 'tiles' | 'photo';
+type Screen = 'studio' | 'print-check';
+type PrintMode = 'safe' | 'borderless';
 interface Tile { id: string; label: number; x: number; y: number; width: number; height: number; rotationDeg: number; }
 interface DragState { id: string; offsetX: number; offsetY: number; before: Tile[]; }
 
@@ -83,6 +85,7 @@ export function App() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageName, setImageName] = useState('');
   const [imageAspect, setImageAspect] = useState(1.5);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [paperId, setPaperId] = useState<PaperPresetId>('letter');
   const [template, setTemplate] = useState<TemplateId>('grid-2');
   const [tiles, setTiles] = useState<Tile[]>(() => tilesForTemplate('grid-2', PAPER_PRESETS.letter));
@@ -92,6 +95,8 @@ export function App() {
   const [photoOffsetX, setPhotoOffsetX] = useState(0);
   const [photoOffsetY, setPhotoOffsetY] = useState(0);
   const [gapMm, setGapMm] = useState(8);
+  const [screen, setScreen] = useState<Screen>('studio');
+  const [printMode, setPrintMode] = useState<PrintMode>('safe');
   const [history, setHistory] = useState<Tile[][]>([]);
   const [redoHistory, setRedoHistory] = useState<Tile[][]>([]);
   const [exportState, setExportState] = useState<'idle' | 'rendering' | 'ready' | 'error'>('idle');
@@ -111,10 +116,10 @@ export function App() {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setNotice('Choose a JPEG, PNG, or WebP image. Nothing was uploaded.'); return; }
     const nextUrl = URL.createObjectURL(file);
     const image = new Image();
-    image.onload = () => setImageAspect(image.naturalWidth / image.naturalHeight);
+    image.onload = () => { setImageAspect(image.naturalWidth / image.naturalHeight); setImageDimensions({ width: image.naturalWidth, height: image.naturalHeight }); };
     image.src = nextUrl;
     setImageUrl((currentUrl) => { if (currentUrl) URL.revokeObjectURL(currentUrl); return nextUrl; });
-    setImageName(file.name); setTemplate('grid-2'); setTiles(tilesForTemplate('grid-2', paper, gapMm)); setSelectedId('tile-1'); setHistory([]); setRedoHistory([]);
+    setImageName(file.name); setTemplate('grid-2'); setTiles(tilesForTemplate('grid-2', paper, gapMm)); setSelectedId('tile-1'); setHistory([]); setRedoHistory([]); setScreen('studio'); setPdfUrl(null);
     setNotice('Your photo is only open in this browser. Start by moving a tile.');
   };
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => { loadImage(event.target.files?.[0]); event.target.value = ''; };
@@ -131,12 +136,15 @@ export function App() {
   const rotateSelected = (amount: number) => { if (!selectedTile) return; const candidate = { ...selectedTile, rotationDeg: ((selectedTile.rotationDeg + amount + 180) % 360) - 180 }; if (!isAllowed(candidate, tiles)) { setNotice('That angle would touch another tile or leave the wall board.'); return; } commitTiles(tiles.map((tile) => tile.id === selectedTile.id ? candidate : tile), `Tile ${selectedTile.label} rotated to ${candidate.rotationDeg}°.`); };
   const undo = () => { const previous = history.at(-1); if (!previous) return; setRedoHistory((current) => [...current, tiles]); setTiles(previous); setHistory((current) => current.slice(0, -1)); setNotice('Undid the last layout change.'); };
   const redo = () => { const next = redoHistory.at(-1); if (!next) return; setHistory((current) => [...current, tiles]); setTiles(next); setRedoHistory((current) => current.slice(0, -1)); setNotice('Restored the layout change.'); };
-  const exportPdf = async () => { if (!imageUrl || !tiles[0]) return; setExportState('rendering'); try { const { generateLayoutPdf } = await import('./editor/export'); const bytes = await generateLayoutPdf({ paper, tiles, imageUrl, imagePlacement: { scalePercent: photoScale, offsetX: photoOffsetX, offsetY: photoOffsetY }, worldScaleMm: paper.heightMm / tiles[0].height }); const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); setPdfUrl(url); setExportState('ready'); setNotice(`Built ${tiles.length} print-ready pages locally.`); } catch (error) { console.error(error); setExportState('error'); setNotice('The PDF could not be created. Your layout is still safe here.'); } };
+  const exportPdf = async () => { if (!imageUrl || !tiles[0]) return; setExportState('rendering'); try { const { generateLayoutPdf } = await import('./editor/export'); const bytes = await generateLayoutPdf({ paper, tiles, imageUrl, imagePlacement: { scalePercent: photoScale, offsetX: photoOffsetX, offsetY: photoOffsetY }, worldScaleMm: paper.heightMm / tiles[0].height, safeMarginMm: printMode === 'safe' ? 6 : 0 }); const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' })); setPdfUrl(url); setExportState('ready'); setNotice(`Built ${tiles.length} print-ready pages locally.`); } catch (error) { console.error(error); setExportState('error'); setNotice('The PDF could not be created. Your layout is still safe here.'); } };
   const tileImageStyle = (tile: Tile) => {
     const imageLeft = (100 - photoScale) / 2 + photoOffsetX;
     const imageTop = (100 - photoScale / imageAspect) / 2 + photoOffsetY;
     return { width: `${(photoScale / tile.width) * 100}%`, left: `${((imageLeft - tile.x) / tile.width) * 100}%`, top: `${((imageTop - tile.y) / tile.height) * 100}%` };
   };
+  const worldScaleMm = tiles[0] ? paper.heightMm / tiles[0].height : 0;
+  const effectivePpi = imageDimensions.width && worldScaleMm ? Math.round(imageDimensions.width / ((photoScale * worldScaleMm) / 25.4)) : null;
+  const qualityMessage = !effectivePpi ? 'Checking source quality…' : effectivePpi >= 150 ? 'Good for normal wall viewing' : effectivePpi >= 100 ? 'May look soft when viewed closely' : 'Likely blurry when viewed closely';
 
   if (!imageUrl) return <main className="start-shell">
     <header className="studio-topbar"><a className="wordmark" href="#top">Expand</a><span className="privacy-note">Private by default</span></header>
@@ -147,8 +155,21 @@ export function App() {
     </section>
   </main>;
 
+  if (screen === 'print-check') return <main className="print-check-shell">
+    <header className="studio-topbar"><button className="brand-button" type="button" onClick={() => { setScreen('studio'); setImageUrl(null); }}>Expand</button><p className="file-name">Print check</p><div className="top-actions"><span className="privacy-note">Local only</span><button className="history-button" type="button" onClick={() => setScreen('studio')}>← Back to edit</button></div></header>
+    <section className="print-check-stage">
+      <div className="print-check-intro"><p className="eyebrow">One last look</p><h1>Ready for the printer?</h1><p>This is the moment to make the physical choices. Your artwork stays in this browser while the PDF is made.</p><div className="assembly-map" aria-label={`${tiles.length} separate page arrangement`}>{tiles.map((tile) => <span key={tile.id} style={{ left: `${tile.x}%`, top: `${tile.y}%`, width: `${tile.width}%`, height: `${tile.height}%`, transform: `rotate(${tile.rotationDeg}deg)` }}>{tile.label}</span>)}</div></div>
+      <div className="print-check-details">
+        <div className="check-summary"><p className="rail-label">Your print</p><dl><div><dt>Pages</dt><dd>{tiles.length} separate {paper.label} sheets</dd></div><div><dt>Wall gap</dt><dd>{gapMm} mm between pages</dd></div><div><dt>Image quality</dt><dd>{qualityMessage}{effectivePpi && <small> · about {effectivePpi} PPI</small>}</dd></div></dl></div>
+        <fieldset className="print-mode"><legend>Printer edge setting</legend><label className={printMode === 'safe' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'safe'} onChange={() => setPrintMode('safe')} /><span><strong>Leave a 6 mm white edge</strong><small>Best for most home printers. The image remains within printable area.</small></span></label><label className={printMode === 'borderless' ? 'print-mode-choice selected' : 'print-mode-choice'}><input type="radio" name="print-mode" checked={printMode === 'borderless'} onChange={() => setPrintMode('borderless')} /><span><strong>Print edge to edge</strong><small>Choose only if your printer supports borderless {paper.label} printing.</small></span></label></fieldset>
+        <div className="home-print-note"><p className="rail-label">When the PDF opens</p><ol><li>Select <strong>{paper.label}</strong> in the print dialog.</li><li>Choose <strong>Actual size</strong> or <strong>100%</strong>—not “Fit to page.”</li><li>Keep every page separate, then mount them with the {gapMm} mm gap shown in the layout.</li></ol></div>
+        <div className="check-actions"><button className="print-button" type="button" onClick={exportPdf} disabled={exportState === 'rendering'}>{exportState === 'rendering' ? 'Building your PDF…' : `Build ${tiles.length}-page PDF →`}</button>{pdfUrl && <a className="pdf-ready-link" href={pdfUrl} download={`expand-layout-${paper.id}.pdf`}>Download PDF</a>}<p className="status-message" role="status">{notice}</p></div>
+      </div>
+    </section>
+  </main>;
+
   return <main className="studio-shell">
-    <header className="studio-topbar"><button className="brand-button" type="button" onClick={() => setImageUrl(null)}>Expand</button><p className="file-name">{imageName}</p><div className="top-actions"><button className="history-button" type="button" onClick={undo} disabled={!history.length}>Undo</button><button className="history-button" type="button" onClick={redo} disabled={!redoHistory.length}>Redo</button><span className="privacy-note">Local only</span><button className="print-button" type="button" onClick={exportPdf} disabled={exportState === 'rendering'}>{exportState === 'rendering' ? 'Building PDF…' : 'Build PDF →'}</button></div></header>
+    <header className="studio-topbar"><button className="brand-button" type="button" onClick={() => setImageUrl(null)}>Expand</button><p className="file-name">{imageName}</p><div className="top-actions"><button className="history-button" type="button" onClick={undo} disabled={!history.length}>Undo</button><button className="history-button" type="button" onClick={redo} disabled={!redoHistory.length}>Redo</button><span className="privacy-note">Local only</span><button className="print-button" type="button" onClick={() => setScreen('print-check')}>Print check →</button></div></header>
     <section className="studio-layout">
       <aside className="left-rail" aria-label="Arrangement tools"><div><p className="rail-label">Quick layouts</p><div className="template-grid">{(Object.keys(templateLabels) as TemplateId[]).map((id) => <button key={id} className={template === id ? 'template-button active' : 'template-button'} type="button" onClick={() => applyTemplate(id)}>{templateLabels[id]}</button>)}</div></div><div className="rail-divider" /><div><p className="rail-label">Edit</p><button className={mode === 'tiles' ? 'mode-button active' : 'mode-button'} type="button" onClick={() => { setMode('tiles'); setNotice('Tile mode: drag a page. Tiles will not overlap.'); }}>Move tiles</button><button className={mode === 'photo' ? 'mode-button active' : 'mode-button'} type="button" onClick={() => { setMode('photo'); setNotice('Photo mode: use the scale control. Tile positions stay fixed.'); }}>Position photo</button></div><p className="rail-hint">Every tile is a separate sheet. The gaps are part of the composition.</p></aside>
       <section className="canvas-area" aria-label="Wall layout canvas"><div className="canvas-header"><div><p className="eyebrow">Wall board</p><h2>{templateLabels[template]} composition</h2></div><p>{mode === 'tiles' ? 'Drag a paper tile' : 'Adjust the photo position'}</p></div><div className={mode === 'photo' ? 'wall-board photo-mode' : 'wall-board'} ref={boardRef} style={boardStyle}><div className="board-tint" />{tiles.map((tile) => <button className={selectedId === tile.id ? 'paper-tile selected' : 'paper-tile'} key={tile.id} type="button" style={{ left: `${tile.x}%`, top: `${tile.y}%`, width: `${tile.width}%`, height: `${tile.height}%`, transform: `rotate(${tile.rotationDeg}deg)` }} onPointerDown={(event) => beginTileDrag(event, tile)} onPointerMove={moveTile} onPointerUp={finishTileDrag} onPointerCancel={finishTileDrag} onClick={() => setSelectedId(tile.id)} aria-label={`Paper tile ${tile.label}, rotated ${tile.rotationDeg} degrees`}>{imageUrl && <img className="tile-photo" src={imageUrl} style={tileImageStyle(tile)} alt="" draggable={false} />}<span>{tile.label}</span></button>)}</div><footer className="canvas-footer"><span>{gapMm} mm layout gap · visible wall space</span><span>● 2-unit snap grid on</span></footer><p className="status-message studio-status" role="status">{notice}</p>{pdfUrl && <a className="pdf-ready-link" href={pdfUrl} download={`expand-layout-${paper.id}.pdf`}>Download {tiles.length}-page PDF</a>}</section>
