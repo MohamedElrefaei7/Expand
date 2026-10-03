@@ -24,6 +24,12 @@ export interface PrintScale {
   y: number;
 }
 
+export interface RegistrationOffset {
+  /** Positive values are the printer's measured right/down placement error in millimeters. */
+  x: number;
+  y: number;
+}
+
 function loadImage(url: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
@@ -51,6 +57,7 @@ function renderPage(
   dpi: number,
   safeMarginMm: number,
   printScale: PrintScale,
+  registrationOffsetMm: RegistrationOffset,
 ) {
   const canvas = document.createElement('canvas');
   const width = Math.round(millimetersToPixels(paper.widthMm, dpi));
@@ -91,7 +98,11 @@ function renderPage(
     translation(width / 2, height / 2),
     multiply(scaling(printScale.x, printScale.y), translation(-width / 2, -height / 2)),
   );
-  setCanvasTransform(context, multiply(compensatePrinterScaling, multiply(worldToPagePixelsMatrix(sheet, paper, dpi), imageToWorld)));
+  const compensateRegistration = translation(
+    -millimetersToPixels(registrationOffsetMm.x, dpi),
+    -millimetersToPixels(registrationOffsetMm.y, dpi),
+  );
+  setCanvasTransform(context, multiply(compensateRegistration, multiply(compensatePrinterScaling, multiply(worldToPagePixelsMatrix(sheet, paper, dpi), imageToWorld))));
   context.drawImage(image, 0, 0);
   context.restore();
 
@@ -116,6 +127,7 @@ export async function generateLayoutPdf({
   dpi = 150,
   safeMarginMm = 0,
   printScale = { x: 1, y: 1 },
+  registrationOffsetMm = { x: 0, y: 0 },
 }: {
   paper: PaperPreset;
   tiles: ExportTile[];
@@ -125,6 +137,7 @@ export async function generateLayoutPdf({
   dpi?: number;
   safeMarginMm?: number;
   printScale?: PrintScale;
+  registrationOffsetMm?: RegistrationOffset;
 }) {
   const image = await loadImage(imageUrl);
   const document = await PDFDocument.create();
@@ -135,7 +148,7 @@ export async function generateLayoutPdf({
   const heightPoints = millimetersToPdfPoints(paper.heightMm);
 
   for (const tile of tiles) {
-    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi, safeMarginMm, printScale);
+    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi, safeMarginMm, printScale, registrationOffsetMm);
     const png = await document.embedPng(await canvasToPngBytes(canvas));
     const page = document.addPage([widthPoints, heightPoints]);
     page.drawImage(png, { x: 0, y: 0, width: widthPoints, height: heightPoints });
@@ -145,7 +158,7 @@ export async function generateLayoutPdf({
   return document.save();
 }
 
-/** A one-page physical test: the first fully visible ruler tick is that edge's printable offset. */
+/** A one-page physical test for paper scale and printer registration. */
 export async function generateCalibrationPdf({ paper }: { paper: PaperPreset }) {
   const document = await PDFDocument.create();
   document.setTitle('Expand printer border calibration');
@@ -157,39 +170,28 @@ export async function generateCalibrationPdf({ paper }: { paper: PaperPreset }) 
   const page = document.addPage([width, height]);
   const ink = rgb(0.12, 0.17, 0.24);
   const muted = rgb(0.32, 0.36, 0.42);
-  const rulerStart = 36 * millimeter;
+  const blue = rgb(0.19, 0.36, 0.73);
+  const edge = 5 * millimeter;
+  const centerX = width / 2;
+  const centerY = height / 2;
 
-  page.drawText('EXPAND · PRINTER BORDER CALIBRATION', { x: rulerStart, y: height - 46 * millimeter, size: 15, color: ink });
-  page.drawText(`Print on ${paper.label} at Actual size / 100%. Do not use Fit to page.`, { x: rulerStart, y: height - 54 * millimeter, size: 9, color: muted });
-  page.drawText('Each ruler tick is 1 mm. On every edge, count from the paper edge to the first fully visible tick.', { x: rulerStart, y: height - 61 * millimeter, size: 9, color: muted });
-  page.drawText('Record that number in Expand. Bold labels mark every 5 mm.', { x: rulerStart, y: height - 67 * millimeter, size: 9, color: muted });
-  page.drawRectangle({ x: 28 * millimeter, y: 28 * millimeter, width: width - 56 * millimeter, height: height - 100 * millimeter, borderColor: muted, borderWidth: 0.5 });
+  page.drawText('EXPAND · PRINTER ALIGNMENT CHECK', { x: 34 * millimeter, y: height - 34 * millimeter, size: 16, color: ink });
+  page.drawText(`Print on ${paper.label} at Actual size / 100%. Do not use Fit to page.`, { x: 34 * millimeter, y: height - 42 * millimeter, size: 9, color: muted });
+  page.drawText('Measure from the physical paper edge to each bold 5 mm line, then enter those four distances in Expand.', { x: 34 * millimeter, y: height - 48 * millimeter, size: 9, color: muted });
 
-  for (let offset = 1; offset <= 25; offset += 1) {
-    const distance = offset * millimeter;
-    const major = offset % 5 === 0;
-    const tickLength = (major ? 14 : 8) * millimeter;
-    const strokeWidth = major ? 1.25 : 0.75;
-    page.drawLine({ start: { x: rulerStart, y: height - distance }, end: { x: rulerStart + tickLength, y: height - distance }, thickness: strokeWidth, color: ink });
-    page.drawLine({ start: { x: rulerStart, y: distance }, end: { x: rulerStart + tickLength, y: distance }, thickness: strokeWidth, color: ink });
-    page.drawLine({ start: { x: distance, y: rulerStart }, end: { x: distance, y: rulerStart + tickLength }, thickness: strokeWidth, color: ink });
-    page.drawLine({ start: { x: width - distance, y: rulerStart }, end: { x: width - distance, y: rulerStart + tickLength }, thickness: strokeWidth, color: ink });
-    if (major) {
-      const text = String(offset);
-      page.drawText(text, { x: rulerStart + 16 * millimeter, y: height - distance - 1.6 * millimeter, size: 9, color: ink });
-      page.drawText(text, { x: rulerStart + 16 * millimeter, y: distance - 1.6 * millimeter, size: 9, color: ink });
-      page.drawText(text, { x: distance - 1.8 * millimeter, y: rulerStart + 16 * millimeter, size: 9, color: ink });
-      page.drawText(text, { x: width - distance - 1.8 * millimeter, y: rulerStart + 16 * millimeter, size: 9, color: ink });
-    }
-  }
-
-  page.drawText('TOP EDGE · 1 MM TICKS', { x: rulerStart + 32 * millimeter, y: height - 20 * millimeter, size: 11, color: ink });
-  page.drawText('BOTTOM EDGE · 1 MM TICKS', { x: rulerStart + 32 * millimeter, y: 10 * millimeter, size: 11, color: ink });
-  page.drawText('LEFT EDGE', { x: 11 * millimeter, y: rulerStart + 32 * millimeter, size: 10, color: ink });
-  page.drawText('RIGHT EDGE', { x: width - 30 * millimeter, y: rulerStart + 32 * millimeter, size: 10, color: ink });
+  page.drawLine({ start: { x: centerX - 26 * millimeter, y: height - edge }, end: { x: centerX + 26 * millimeter, y: height - edge }, thickness: 2, color: blue });
+  page.drawText('TOP · 5 mm LINE', { x: centerX - 24 * millimeter, y: height - 15 * millimeter, size: 11, color: ink });
+  page.drawLine({ start: { x: centerX - 26 * millimeter, y: edge }, end: { x: centerX + 26 * millimeter, y: edge }, thickness: 2, color: blue });
+  page.drawText('BOTTOM · 5 mm LINE', { x: centerX - 30 * millimeter, y: 14 * millimeter, size: 11, color: ink });
+  page.drawLine({ start: { x: edge, y: centerY - 26 * millimeter }, end: { x: edge, y: centerY + 26 * millimeter }, thickness: 2, color: blue });
+  page.drawText('LEFT', { x: 11 * millimeter, y: centerY + 31 * millimeter, size: 10, color: ink });
+  page.drawText('5 mm', { x: 11 * millimeter, y: centerY + 25 * millimeter, size: 10, color: ink });
+  page.drawLine({ start: { x: width - edge, y: centerY - 26 * millimeter }, end: { x: width - edge, y: centerY + 26 * millimeter }, thickness: 2, color: blue });
+  page.drawText('RIGHT', { x: width - 30 * millimeter, y: centerY + 31 * millimeter, size: 10, color: ink });
+  page.drawText('5 mm', { x: width - 29 * millimeter, y: centerY + 25 * millimeter, size: 10, color: ink });
   const squareSize = 100 * millimeter;
   const squareX = (width - squareSize) / 2;
-  const squareY = (height - squareSize) / 2 - 7 * millimeter;
+  const squareY = (height - squareSize) / 2 - 3 * millimeter;
   page.drawRectangle({ x: squareX, y: squareY, width: squareSize, height: squareSize, borderColor: ink, borderWidth: 1.5 });
   page.drawText('PRINT-SCALE CHECK', { x: squareX + 25 * millimeter, y: squareY + squareSize / 2 + 7 * millimeter, size: 12, color: ink });
   page.drawText('Measure this square edge to edge.', { x: squareX + 19 * millimeter, y: squareY + squareSize / 2, size: 9, color: muted });
