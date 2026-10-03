@@ -19,6 +19,11 @@ export interface ImagePlacement {
   offsetY: number;
 }
 
+export interface PrintScale {
+  x: number;
+  y: number;
+}
+
 function loadImage(url: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
@@ -45,6 +50,7 @@ function renderPage(
   worldScaleMm: number,
   dpi: number,
   safeMarginMm: number,
+  printScale: PrintScale,
 ) {
   const canvas = document.createElement('canvas');
   const width = Math.round(millimetersToPixels(paper.widthMm, dpi));
@@ -81,7 +87,11 @@ function renderPage(
   context.beginPath();
   context.rect(safeMarginPixels, safeMarginPixels, width - safeMarginPixels * 2, height - safeMarginPixels * 2);
   context.clip();
-  setCanvasTransform(context, multiply(worldToPagePixelsMatrix(sheet, paper, dpi), imageToWorld));
+  const compensatePrinterScaling = multiply(
+    translation(width / 2, height / 2),
+    multiply(scaling(printScale.x, printScale.y), translation(-width / 2, -height / 2)),
+  );
+  setCanvasTransform(context, multiply(compensatePrinterScaling, multiply(worldToPagePixelsMatrix(sheet, paper, dpi), imageToWorld)));
   context.drawImage(image, 0, 0);
   context.restore();
 
@@ -105,6 +115,7 @@ export async function generateLayoutPdf({
   worldScaleMm,
   dpi = 150,
   safeMarginMm = 0,
+  printScale = { x: 1, y: 1 },
 }: {
   paper: PaperPreset;
   tiles: ExportTile[];
@@ -113,6 +124,7 @@ export async function generateLayoutPdf({
   worldScaleMm: number;
   dpi?: number;
   safeMarginMm?: number;
+  printScale?: PrintScale;
 }) {
   const image = await loadImage(imageUrl);
   const document = await PDFDocument.create();
@@ -123,7 +135,7 @@ export async function generateLayoutPdf({
   const heightPoints = millimetersToPdfPoints(paper.heightMm);
 
   for (const tile of tiles) {
-    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi, safeMarginMm);
+    const canvas = renderPage(tile, paper, image, imagePlacement, worldScaleMm, dpi, safeMarginMm, printScale);
     const png = await document.embedPng(await canvasToPngBytes(canvas));
     const page = document.addPage([widthPoints, heightPoints]);
     page.drawImage(png, { x: 0, y: 0, width: widthPoints, height: heightPoints });
@@ -175,5 +187,12 @@ export async function generateCalibrationPdf({ paper }: { paper: PaperPreset }) 
   page.drawText('BOTTOM EDGE · 1 MM TICKS', { x: rulerStart + 32 * millimeter, y: 10 * millimeter, size: 11, color: ink });
   page.drawText('LEFT EDGE', { x: 11 * millimeter, y: rulerStart + 32 * millimeter, size: 10, color: ink });
   page.drawText('RIGHT EDGE', { x: width - 30 * millimeter, y: rulerStart + 32 * millimeter, size: 10, color: ink });
+  const squareSize = 100 * millimeter;
+  const squareX = (width - squareSize) / 2;
+  const squareY = (height - squareSize) / 2 - 7 * millimeter;
+  page.drawRectangle({ x: squareX, y: squareY, width: squareSize, height: squareSize, borderColor: ink, borderWidth: 1.5 });
+  page.drawText('PRINT-SCALE CHECK', { x: squareX + 25 * millimeter, y: squareY + squareSize / 2 + 7 * millimeter, size: 12, color: ink });
+  page.drawText('Measure this square edge to edge.', { x: squareX + 19 * millimeter, y: squareY + squareSize / 2, size: 9, color: muted });
+  page.drawText('It should be exactly 100 mm wide and 100 mm tall.', { x: squareX + 11 * millimeter, y: squareY + squareSize / 2 - 6 * millimeter, size: 9, color: muted });
   return document.save();
 }
